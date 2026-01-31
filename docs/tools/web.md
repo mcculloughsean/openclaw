@@ -11,7 +11,7 @@ title: "Web Tools"
 
 OpenClaw ships two lightweight web tools:
 
-- `web_search` — Search the web via Brave Search API (default) or Perplexity Sonar (direct or via OpenRouter).
+- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar (direct or via OpenRouter), or Kagi Search (closed beta).
 - `web_fetch` — HTTP fetch + readable extraction (HTML → markdown/text).
 
 These are **not** browser automation. For JS-heavy sites or logins, use the
@@ -20,8 +20,9 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 ## How it works
 
 - `web_search` calls your configured provider and returns results.
-  - **Brave** (default): returns structured results (title, URL, snippet).
-  - **Perplexity**: returns AI-synthesized answers with citations from real-time web search.
+  - **Brave** (default): returns structured results (title, URL, snippet). Supports advanced parameters (country, language, freshness).
+  - **Perplexity**: returns AI-synthesized answers with citations from real-time web search. Supports only query and count parameters.
+  - **Kagi** (closed beta): privacy-focused, ad-free search returning structured results (title, URL, snippet). Supports only query and count parameters.
 - Results are cached by query for 15 minutes (configurable).
 - `web_fetch` does a plain HTTP GET and extracts readable content
   (HTML → markdown/text). It does **not** execute JavaScript.
@@ -29,10 +30,11 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 
 ## Choosing a search provider
 
-| Provider            | Pros                                         | Cons                                     | API Key                                      |
-| ------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
-| **Brave** (default) | Fast, structured results, free tier          | Traditional search results               | `BRAVE_API_KEY`                              |
-| **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
+| Provider | Pros | Cons | API Key | Cost |
+|----------|------|------|---------|------|
+| **Brave** (default) | Fast, structured results, free tier | Traditional search results | `BRAVE_API_KEY` | Free tier + paid plans |
+| **Perplexity** | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` | Per-token pricing |
+| **Kagi** (closed beta) | Privacy-focused, ad-free, high-quality results | Requires invitation, no free tier | `KAGI_API_KEY` | $25 per 1000 queries |
 
 See [Brave Search setup](/brave-search) and [Perplexity Sonar](/perplexity) for provider-specific details.
 
@@ -43,10 +45,10 @@ Set the provider in config:
   tools: {
     web: {
       search: {
-        provider: "brave", // or "perplexity"
-      },
-    },
-  },
+        provider: "brave"  // or "perplexity" or "kagi"
+      }
+    }
+  }
 }
 ```
 
@@ -139,6 +141,66 @@ If no base URL is set, OpenClaw chooses a default based on the API key source:
 | `perplexity/sonar-pro` (default) | Multi-step reasoning with web search | Complex questions |
 | `perplexity/sonar-reasoning-pro` | Chain-of-thought analysis            | Deep research     |
 
+## Using Kagi (closed beta)
+
+Kagi is a privacy-focused, ad-free search engine with a powerful API. It's currently in closed beta
+and requires an invitation from the Kagi team.
+
+### Getting a Kagi API key
+
+1) Request API access by emailing support@kagi.com (mention you want to use it with OpenClaw)
+2) Once approved, generate an API key in your Kagi account settings
+3) Configure the key using one of the methods below
+
+### Setting up Kagi search
+
+**Config file (recommended):**
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        enabled: true,
+        provider: "kagi",
+        kagi: {
+          apiKey: "your-kagi-api-key"
+        }
+      }
+    }
+  }
+}
+```
+
+**Environment variable:**
+
+```bash
+export KAGI_API_KEY="your-kagi-api-key"
+```
+
+For a gateway install, put it in `~/.clawdbot/.env`.
+
+**CLI command:**
+
+```bash
+moltbot config set tools.web.search.provider kagi
+moltbot config set tools.web.search.kagi.apiKey "your-kagi-api-key"
+```
+
+### Supported parameters
+
+Kagi supports only the basic search parameters:
+
+- `query` (required)
+- `count` (1-10, default 5)
+
+**Not supported:** `country`, `search_lang`, `ui_lang`, `freshness` (these are Brave-only parameters)
+
+### Cost considerations
+
+Kagi API pricing is $25 per 1000 queries (2.5¢ per search). There is no free tier.
+Monitor your usage in the Kagi dashboard.
+
 ## web_search
 
 Search the web using your configured provider.
@@ -149,6 +211,7 @@ Search the web using your configured provider.
 - API key for your chosen provider:
   - **Brave**: `BRAVE_API_KEY` or `tools.web.search.apiKey`
   - **Perplexity**: `OPENROUTER_API_KEY`, `PERPLEXITY_API_KEY`, or `tools.web.search.perplexity.apiKey`
+  - **Kagi**: `KAGI_API_KEY` or `tools.web.search.kagi.apiKey`
 
 ### Config
 
@@ -170,12 +233,14 @@ Search the web using your configured provider.
 
 ### Tool parameters
 
-- `query` (required)
-- `count` (1–10; default from config)
-- `country` (optional): 2-letter country code for region-specific results (e.g., "DE", "US", "ALL"). If omitted, Brave chooses its default region.
-- `search_lang` (optional): ISO language code for search results (e.g., "de", "en", "fr")
-- `ui_lang` (optional): ISO language code for UI elements
-- `freshness` (optional, Brave only): filter by discovery time (`pd`, `pw`, `pm`, `py`, or `YYYY-MM-DDtoYYYY-MM-DD`)
+- `query` (required) — all providers
+- `count` (1–10; default from config) — all providers
+- `country` (optional, **Brave only**): 2-letter country code for region-specific results (e.g., "DE", "US", "ALL"). If omitted, Brave chooses its default region.
+- `search_lang` (optional, **Brave only**): ISO language code for search results (e.g., "de", "en", "fr")
+- `ui_lang` (optional, **Brave only**): ISO language code for UI elements
+- `freshness` (optional, **Brave only**): filter by discovery time (`pd`, `pw`, `pm`, `py`, or `YYYY-MM-DDtoYYYY-MM-DD`)
+
+**Note:** Perplexity and Kagi only support `query` and `count` parameters. Attempting to use Brave-only parameters with these providers will return an error.
 
 **Examples:**
 
