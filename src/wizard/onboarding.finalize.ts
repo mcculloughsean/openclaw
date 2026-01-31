@@ -431,29 +431,46 @@ export async function finalizeOnboardingWizard(options: FinalizeOnboardingOption
     );
   }
 
-  const webSearchKey = (nextConfig.tools?.web?.search?.apiKey ?? "").trim();
-  const webSearchEnv = (process.env.BRAVE_API_KEY ?? "").trim();
-  const hasWebSearchKey = Boolean(webSearchKey || webSearchEnv);
+  const braveKey = (nextConfig.tools?.web?.search?.apiKey ?? "").trim();
+  const perplexityKey = (nextConfig.tools?.web?.search?.perplexity?.apiKey ?? "").trim();
+  const kagiKey = (nextConfig.tools?.web?.search?.kagi?.apiKey ?? "").trim();
+  const braveEnv = (process.env.BRAVE_API_KEY ?? "").trim();
+  const perplexityEnv = (
+    process.env.PERPLEXITY_API_KEY ??
+    process.env.OPENROUTER_API_KEY ??
+    ""
+  ).trim();
+  const kagiEnv = (process.env.KAGI_API_KEY ?? "").trim();
+  const hasWebSearchKey = Boolean(
+    braveKey || perplexityKey || kagiKey || braveEnv || perplexityEnv || kagiEnv,
+  );
+  const provider = nextConfig.tools?.web?.search?.provider ?? "brave";
+
   await prompter.note(
     hasWebSearchKey
       ? [
           "Web search is enabled, so your agent can look things up online when needed.",
           "",
-          webSearchKey
+          `Provider: ${provider}`,
+          braveKey
             ? "API key: stored in config (tools.web.search.apiKey)."
-            : "API key: provided via BRAVE_API_KEY env var (Gateway environment).",
+            : perplexityKey
+              ? "API key: stored in config (tools.web.search.perplexity.apiKey)."
+              : kagiKey
+                ? "API key: stored in config (tools.web.search.kagi.apiKey)."
+                : `API key: provided via ${provider.toUpperCase()}_API_KEY env var (Gateway environment).`,
           "Docs: https://docs.openclaw.ai/tools/web",
         ].join("\n")
       : [
-          "If you want your agent to be able to search the web, you’ll need an API key.",
+          "If you want your agent to be able to search the web, you'll need an API key.",
           "",
-          "OpenClaw uses Brave Search for the `web_search` tool. Without a Brave Search API key, web search won’t work.",
+          "OpenClaw supports three search providers: Brave Search (default), Perplexity Sonar, or Kagi.",
           "",
           "Set it up interactively:",
           `- Run: ${formatCliCommand("openclaw configure --section web")}`,
-          "- Enable web_search and paste your Brave Search API key",
+          "- Choose your provider and enter your API key",
           "",
-          "Alternative: set BRAVE_API_KEY in the Gateway environment (no config changes).",
+          "Alternative: set provider API key in the Gateway environment (no config changes).",
           "Docs: https://docs.openclaw.ai/tools/web",
         ].join("\n"),
     "Web search (optional)",
