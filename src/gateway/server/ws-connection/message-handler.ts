@@ -834,7 +834,15 @@ export function attachGatewayWsMessageHandler(params: {
         };
         setClient(nextClient);
         setHandshakeState("connected");
-        if (role === "node") {
+
+        // Register as node based on clientMode + capabilities, not just role.
+        // This allows hybrid clients (role=operator + clientMode=node + caps) to receive node commands.
+        const hasNodeCapabilities =
+          connectParams.client.mode === "node" &&
+          Array.isArray(connectParams.caps) &&
+          connectParams.caps.length > 0;
+
+        if (role === "node" || hasNodeCapabilities) {
           const context = buildRequestContext();
           const nodeSession = context.nodeRegistry.register(nextClient, {
             remoteIp: reportedClientIp,

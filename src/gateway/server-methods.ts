@@ -1,3 +1,4 @@
+import type { NodeRegistry } from "./node-registry.js";
 import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-methods/types.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import { agentHandlers } from "./server-methods/agent.js";
@@ -90,22 +91,37 @@ const WRITE_METHODS = new Set([
   "browser.request",
 ]);
 
-function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
+function authorizeGatewayMethod(
+  method: string,
+  client: GatewayRequestOptions["client"],
+  context?: { nodeRegistry?: NodeRegistry },
+) {
   if (!client?.connect) {
     return null;
   }
   const role = client.connect.role ?? "operator";
   const scopes = client.connect.scopes ?? [];
+
+  // Check if client is a registered node (for hybrid clients)
+  const isRegisteredNode =
+    client.connId && context?.nodeRegistry?.getByConnId(client.connId) !== undefined;
+
+  // NODE_ROLE_METHODS: allow if role=node OR registered as node
   if (NODE_ROLE_METHODS.has(method)) {
-    if (role === "node") {
+    if (role === "node" || isRegisteredNode) {
       return null;
     }
+    return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized: not a registered node`);
+  }
+
+  // Pure nodes (no operator scopes) can't call operator methods
+  if (role === "node" && scopes.length === 0) {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
   }
-  if (role === "node") {
-    return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
-  }
-  if (role !== "operator") {
+
+  // For hybrid clients (registered node with operator scopes), continue to scope checks
+  // For pure operators, continue to scope checks
+  if (role !== "operator" && role !== "node") {
     return errorShape(ErrorCodes.INVALID_REQUEST, `unauthorized role: ${role}`);
   }
   if (scopes.includes(ADMIN_SCOPE)) {
@@ -191,7 +207,9 @@ export async function handleGatewayRequest(
   opts: GatewayRequestOptions & { extraHandlers?: GatewayRequestHandlers },
 ): Promise<void> {
   const { req, respond, client, isWebchatConnect, context } = opts;
-  const authError = authorizeGatewayMethod(req.method, client);
+  const authError = authorizeGatewayMethod(req.method, client, {
+    nodeRegistry: context.nodeRegistry,
+  });
   if (authError) {
     respond(false, undefined, authError);
     return;

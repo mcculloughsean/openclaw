@@ -104,6 +104,11 @@ export class NodeRegistry {
     return this.nodesById.get(nodeId);
   }
 
+  getByConnId(connId: string): NodeSession | undefined {
+    const nodeId = this.nodesByConn.get(connId);
+    return nodeId ? this.nodesById.get(nodeId) : undefined;
+  }
+
   async invoke(params: {
     nodeId: string;
     command: string;
